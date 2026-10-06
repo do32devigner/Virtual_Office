@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kota Virtual | Training Centre, Creative Agency, Apartemen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=DM+Sans:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#303050;--paper:#f8f8f0;--bg:#181229}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:#f3ecff;font-family:'DM Sans',system-ui,sans-serif}
+body{display:flex;flex-direction:column;align-items:center;padding:10px 10px 44px}
+header{width:100%;max-width:1100px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+h1{font:13px/1.4 'Press Start 2P',monospace;margin:0}
+.btn{font:700 13px 'DM Sans',sans-serif;background:var(--paper);color:var(--ink);border:3px solid var(--ink);box-shadow:0 3px 0 var(--ink);padding:6px 12px;cursor:pointer}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 var(--ink)}
+.btn:focus-visible,.badge:focus-visible{outline:3px solid #ffd166;outline-offset:2px}
+#stage{position:relative;width:100%;max-width:1100px;border:4px solid #3d2f66;box-shadow:0 0 0 4px #0e0a1a;background:#000}
+canvas{display:block;width:100%;height:auto;image-rendering:pixelated;touch-action:manipulation}
+#wx{position:absolute;top:8px;right:8px;background:var(--paper);color:var(--ink);border:3px solid var(--ink);padding:5px 9px;font-size:12px;font-weight:700;text-align:right;line-height:1.3;max-width:70%}
+#wx small{display:block;font-weight:500;opacity:.7}
+#badges{position:absolute;inset:0;pointer-events:none}
+.badge{position:absolute;transform:translate(-50%,-100%);pointer-events:auto;cursor:pointer;background:var(--paper);color:var(--ink);border:3px solid var(--ink);box-shadow:0 3px 0 var(--ink);padding:4px 8px;text-align:center;font-family:'DM Sans',sans-serif;line-height:1.25}
+.badge b{display:block;font:8px/1.3 'Press Start 2P',monospace}
+.badge i{display:block;font-size:11px;font-style:normal;opacity:.75}
+.badge .st{display:inline-block;margin-top:2px;padding:1px 7px;font-size:11px;font-weight:700;color:#10231a;background:#ffc857}
+.st.work{background:#5be3a0}.st.ot{background:#ff6b81;color:#fff;animation:pl 1s steps(2) infinite}.st.off{background:#c9c3d9}
+@keyframes pl{50%{opacity:.55}}
+#otban{position:absolute;left:50%;top:10px;transform:translateX(-50%);background:#ff6b81;color:#fff;border:3px solid var(--ink);padding:5px 10px;font:8px 'Press Start 2P',monospace;cursor:pointer;animation:pl 1s steps(2) infinite}
+#bar{position:fixed;left:0;right:0;bottom:0;background:#0e0a1a;border-top:3px solid #3d2f66;padding:7px 12px;font-size:12px;color:#c9bfe6;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+#modal{position:fixed;inset:0;background:rgba(10,6,22,.7);display:none;align-items:center;justify-content:center;padding:16px;z-index:10}
+#modal.open{display:flex}
+.card{background:var(--paper);color:var(--ink);border:4px solid var(--ink);box-shadow:6px 6px 0 #0e0a1a;max-width:400px;width:100%;padding:16px;max-height:90vh;overflow:auto}
+.card h2{font:11px/1.6 'Press Start 2P',monospace;margin:0 0 4px}.card .sub{opacity:.7;font-size:13px;margin-bottom:10px}
+dl{margin:10px 0 0;display:grid;grid-template-columns:95px 1fr;gap:6px 10px;font-size:14px}dt{opacity:.65}dd{margin:0;word-break:break-word}
+@media(max-width:600px){.badge i{display:none}.badge{padding:2px 5px}.badge b{font-size:6px}#wx{font-size:10px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Kota Virtual</h1>
+  <div style="display:flex;gap:8px">
+    <button class="btn" id="back" hidden>⬅️ Kembali ke Peta Kota</button>
+    <button class="btn" id="mute" aria-label="Suara hujan dan klik" aria-pressed="false">🔇</button>
+  </div>
+</header>
+<div id="stage">
+  <canvas id="c" role="img" aria-label="Peta kota isometric dengan tiga gedung: Training Centre, Creative Agency, Apartemen Pekerja"></canvas>
+  <div id="wx">📍 Jakarta | --°C | memuat...</div>
+  <div id="badges"></div>
+  <button id="otban" hidden>⚡ OVERTIME ACTIVE</button>
+</div>
+<div id="bar"><span id="sync">Last Sync: --:--:-- | Firebase Status: Disconnected</span><span id="hint">Klik gedung untuk masuk. Klik agen untuk detail.</span></div>
+<div id="modal" role="dialog" aria-modal="true"><div class="card"><h2 id="mt"></h2><div class="sub" id="ms"></div><dl id="md"></dl><button class="btn" id="mx" style="margin-top:14px">Tutup</button></div></div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script>
+/* ================================================================
+   1. KONFIGURASI (edit di sini)
+   Parameter uji coba di URL: ?jam=21  ?hujan=1  ?lembur=1
+================================================================ */
+const firebaseConfig = {
+  apiKey: "AIzaSyD6O0GLosgz_RSYo_P6J2AhetQ2V-z_II8",
+  authDomain: "virtual-office-b0ca7.firebaseapp.com",
+  databaseURL: "https://virtual-office-b0ca7-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "virtual-office-b0ca7",
+  storageBucket: "virtual-office-b0ca7.firebasestorage.app",
+  messagingSenderId: "356736573426",
+  appId: "1:356736573426:web:2d91020340e5c729ad956b",
+  measurementId: "G-95TXY03QY5"
+};
+const NODES = {tc:'city/training_centre', ca:'city/creative_agency', apt:'city/apartment'};
+const WX_URL = 'https://api.open-meteo.com/v1/forecast?latitude=-6.2088&longitude=106.8456&current=temperature_2m,is_day,rain,weather_code&timezone=Asia%2FJakarta';
+const WX_EVERY = 15*60*1000;         // cuaca dipanggil tiap 15 menit, bukan tiap frame
+const Q = new URLSearchParams(location.search);
+
+/* ================================================================
+   2. UTILITAS GAMBAR + PROYEKSI ISOMETRIC
+================================================================ */
+const $ = s => document.querySelector(s);
+const cv = $('#c'), ctx = cv.getContext('2d'), W = 480, H = 300;
+cv.width = W; cv.height = H;
+let TW=14, TH=7, OX=240, OY=76;                       // parameter proyeksi aktif
+const setProj = m => { if(m==='macro'){TW=14;TH=7;OX=240;OY=76;} else {TW=18;TH=9;OX=240;OY=108;} };
+const P = (x,y,z=0) => [Math.round(OX+(x-y)*TW), Math.round(OY+(x+y)*TH-z)];
+const hex = c => [1,3,5].map(i=>parseInt(c.substr(i,2),16));
+const mix = (a,b,k) => a.map((v,i)=>Math.round(v+(b[i]-v)*k));
+const shade = (c,k) => 'rgb('+mix(hex(c),[0,0,0],k).join(',')+')';
+const clamp = (v,a=0,b=1) => Math.min(b,Math.max(a,v));
+function poly(pts,col){ctx.fillStyle=col;ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.fill();}
+function R(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(Math.round(x),Math.round(y),w,h);}
+function edge(a,b,c,w=2){ctx.strokeStyle=c;ctx.lineWidth=w;ctx.beginPath();ctx.moveTo(a[0]+.5,a[1]+.5);ctx.lineTo(b[0]+.5,b[1]+.5);ctx.stroke();}
+function box(x,y,z,w,d,h,c){ // balok isometric, warna tutup = c, sisi otomatis lebih gelap
+  poly([P(x,y+d,z),P(x+w,y+d,z),P(x+w,y+d,z+h),P(x,y+d,z+h)],shade(c,.2));
+  poly([P(x+w,y,z),P(x+w,y+d,z),P(x+w,y+d,z+h),P(x+w,y,z+h)],shade(c,.35));
+  poly([P(x,y,z+h),P(x+w,y,z+h),P(x+w,y+d,z+h),P(x,y+d,z+h)],c);
+}
+const rnd = n => {n=Math.sin(n*127.1)*43758.5453;return n-Math.floor(n)};
+
+/* ================================================================
+   3. WAKTU JAKARTA (WIB) + LANGIT DINAMIS
+   05.00-08.00 pagi | 08.01-16.59 siang | 17.00-18.30 senja | 18.31-04.59 malam
+================================================================ */
+function nowWIB(){
+  const q=Q.get('jam'); if(q!==null&&q!==''&&!isNaN(+q))return ((+q)%24+24)%24;
+  const d=new Date(); return (d.getUTCHours()+7)%24+d.getUTCMinutes()/60+d.getUTCSeconds()/3600;
+}
+const fmtWIB = d => [(d.getUTCHours()+7)%24,d.getUTCMinutes(),d.getUTCSeconds()].map(n=>String(n).padStart(2,'0')).join(':');
+const NIGHT=['#0a0e2a','#0e1540','#141c52','#1a2462','#212c72','#283682'];
+const MORN=['#6fb6ee','#8fc6f2','#b0d6f5','#f3cfa8','#ffc89a','#ffd9a8'];
+const DAYC=['#4aa8ec','#6cbcf2','#8ccff7','#abdffa','#c9edfd','#e4f7ff'];
+const SUNS=['#3b5fb0','#8a6ab0','#e0805a','#ffa24a','#ffc060','#ffe08a'];
+const SKYK=[[0,NIGHT,.62],[4.8,NIGHT,.62],[5.4,MORN,.12],[8,MORN,.08],[8.5,DAYC,0],[16.8,DAYC,0],[17.1,SUNS,.18],[18.4,SUNS,.25],[18.9,NIGHT,.62],[24,NIGHT,.62]];
+function skyAt(h){
+  let i=0; while(i<SKYK.length-2&&h>=SKYK[i+1][0])i++;
+  const a=SKYK[i],b=SKYK[i+1],k=clamp((h-a[0])/(b[0]-a[0]));
+  return {cols:a[1].map((c,j)=>'rgb('+mix(hex(c),hex(b[1][j]),k).join(',')+')'),d:a[2]+(b[2]-a[2])*k};
+}
+
+/* ================================================================
+   4. CUACA (Open-Meteo) + FALLBACK OFFLINE
+================================================================ */
+let WX={ok:false}, raining=false, rainK=0, muted=true;
+const wxLabel=c=>c==null?['☁️','--']:c===0?['☀️','Cerah']:c<=2?['🌤️','Cerah Berawan']:c===3?['☁️','Berawan']:c<=48?['🌫️','Berkabut']:c<=57?['🌦️','Gerimis']:c<=67?['🌧️','Hujan']:c<=77?['❄️','Salju']:c<=82?['🌧️','Hujan Lebat']:c<=86?['❄️','Salju']:['⛈️','Badai Petir'];
+async function fetchWeather(){
+  try{
+    const r=await fetch(WX_URL,{cache:'no-store'}); if(!r.ok)throw new Error('http');
+    const c=(await r.json()).current;
+    WX={ok:true,temp:c.temperature_2m,rain:c.rain,code:c.weather_code,isDay:c.is_day};
+  }catch(e){WX={ok:false};}          // gagal/offline: langit tetap pakai jam sistem, hujan dimatikan
+  renderWx();
+}
+function renderWx(){
+  raining = Q.get('hujan')==='1' || (WX.ok && (WX.rain>0 || WX.code>=51));
+  const [ic,tx]=WX.ok?wxLabel(raining&&WX.code<51?61:WX.code):['📴','Offline (jam lokal)'];
+  $('#wx').innerHTML='📍 Jakarta | '+(WX.ok?Math.round(WX.temp)+'°C':'--°C')+' | '+ic+' '+tx+'<small>WIB '+fmtWIB(new Date()).slice(0,5)+'</small>';
+}
+addEventListener('offline',()=>{WX={ok:false};renderWx();}); addEventListener('online',fetchWeather);
+
+/* ================================================================
+   5. FIREBASE (node city/training_centre, city/creative_agency, city/apartment)
+   Bentuk data yang didukung per node:
+   { is_overtime:true, telegram_status:"URGENT", badge:"teks opsional",
+     agents:{ atlas:{status,activity,updated_at,is_overtime}, ... } }
+================================================================ */
+const DB={tc:null,ca:null,apt:null}, fb={ok:false,sync:null,demo:false,err:''};
+function startFirebase(){
+  // SDK gagal dimuat / config kosong: langsung pakai data demo
+  if(typeof firebase==='undefined'||!firebaseConfig||!firebaseConfig.databaseURL){fb.err='SDK Firebase tidak termuat';startDemo();return;}
+  try{
+    if(!firebase.apps.length)firebase.initializeApp(firebaseConfig);
+    const db=firebase.database();
+    // Status koneksi tidak bergantung pada login, jadi dipasang langsung
+    db.ref('.info/connected').on('value',s=>{fb.ok=!!s.val();});
+    let started=false;
+    const listen=()=>{
+      if(started)return; started=true;
+      Object.entries(NODES).forEach(([k,p])=>db.ref(p).on('value',s=>{DB[k]=s.val();fb.sync=new Date();fb.demo=false;fb.err='';},
+        e=>{fb.err=e&&e.code?e.code:'read gagal';if(!fb.sync)startDemo();}));   // mis. PERMISSION_DENIED -> data demo
+    };
+    // Login anonim (opsional). Jika gagal/lambat, pembacaan tetap dimulai maksimal 3 detik kemudian.
+    if(firebase.auth){
+      firebase.auth().signInAnonymously().catch(e=>{fb.err='auth: '+(e&&e.code||'gagal');console.warn('Login anonim gagal:',e);}).then(listen);
+      setTimeout(listen,3000);
+    }else listen();
+    setTimeout(()=>{if(!fb.sync)startDemo();},8000);  // tidak ada respons sama sekali -> data demo
+  }catch(e){fb.ok=false;fb.err=String(e&&e.message||e);startDemo();}
+}
+function startDemo(){ // data contoh bila config belum diisi
+  fb.demo=true;fb.sync=new Date();
+  DB.tc={agents:{atlas:{status:'working',activity:'Menganalisis soal CPNS TWK'},leo:{status:'working',activity:'Menyusun materi tryout'}}};
+  DB.ca={agents:{luna:{status:'working',activity:'Memantau tren konten anak'},milo:{status:'working',activity:'Menulis naskah dongeng'}}};
+  DB.apt={is_overtime:false};
+}
+
+/* ================================================================
+   6. AGEN & ATURAN LOKASI / STATUS
+================================================================ */
+const BLD={
+  tc :{name:'TRAINING CENTRE',label:'CPNS Prep Div.',x:1,y:1,w:5,d:5,h:34,f1:'#d9e4f5',f2:'#c4d3ec',wall:'#8fa8d6',wall2:'#6f8ac0',acc:'#4aa8ec',sign:'TRAINING CENTRE'},
+  ca :{name:'CREATIVE AGENCY',label:'Children Div.',x:8,y:1,w:5,d:5,h:34,f1:'#f6dcea',f2:'#eecbdd',wall:'#f3a6c8',wall2:'#d97fa8',acc:'#ff7aa8',sign:'CREATIVE AGENCY'},
+  apt:{name:'APARTEMEN PEKERJA',label:'Staff Residential / Basecamp',x:1,y:8,w:5,d:5,h:44,f1:'#efe3c8',f2:'#e2d3b0',wall:'#d9b88a',wall2:'#b8956a',acc:'#ffd166',sign:'APARTEMEN'}};
+const AGENTS=[
+  {id:'atlas',name:'Atlas',role:'Staff - Exam Analyst',home:'tc',desk:0,i:0,shirt:'#4aa8ec',hair:'#2b1d12',skin:'#f5cba7',x:'glasses',act:'Menganalisis soal CPNS'},
+  {id:'leo',name:'Leo',role:'Team Leader - Master Tutor',home:'tc',desk:1,i:1,shirt:'#2f9e5b',hair:'#6b3a1e',skin:'#e0a97a',x:'tie',act:'Menyusun materi tutor'},
+  {id:'luna',name:'Luna',role:'Staff - Trend Scout',home:'ca',desk:0,i:2,shirt:'#b197fc',hair:'#d9576b',skin:'#f5cba7',x:'pigtail',act:'Memantau tren anak'},
+  {id:'milo',name:'Milo',role:'Team Leader - Storywriter',home:'ca',desk:1,i:3,shirt:'#ffa94d',hair:'#a8323e',skin:'#c98b5a',x:'beret',act:'Menulis cerita anak'}];
+const urgent = v => /urgent/i.test(String(v||''));
+function rawOf(a){for(const k of [a.home,'apt']){const n=DB[k];if(n){const r=(n.agents&&n.agents[a.id])||n[a.id];if(r&&typeof r==='object')return r;}}return {};}
+/* Jam kerja 08.00-17.00: di kantor. Di luar itu: apartemen (rest/sleep), atau overtime jika is_overtime / URGENT. */
+function stateOf(a,h){
+  const raw=rawOf(a), m=h*60;
+  if(m>=480&&m<=1020)return {loc:a.home,mode:'work',status:'Working at Office',raw};
+  const g=['tc','ca','apt'].some(k=>DB[k]&&(DB[k].is_overtime===true||urgent(DB[k].telegram_status)||urgent(DB[k].status)))||Q.get('lembur')==='1';
+  const ot=raw.is_overtime===true||urgent(raw.status)||urgent(raw.telegram_status)||(raw.is_overtime===undefined&&g);
+  if(ot)return {loc:'apt',mode:'overtime',status:'Remote Working (Overtime)',raw};
+  return {loc:'apt',mode:(h>=22||h<5)?'sleep':'rest',status:'Resting / Standby',raw};
+}
+const actOf=(a,S)=>S.raw.activity||(S.mode==='work'?a.act:S.mode==='overtime'?'Menangani tugas URGENT dari jarak jauh':S.mode==='sleep'?'Tidur':'Beristirahat di apartemen');
+const fmtT = v => {if(!v)return '-';const n=Number(v),d=new Date(isNaN(n)?v:(n<1e11?n*1000:n));return isNaN(d)?String(v):fmtWIB(d)+' WIB';};
+
+/* ================================================================
+   7. AUDIO (opsional, default mati): suara hujan + bunyi klik, dibuat lewat WebAudio
+================================================================ */
+let AC=null, rainGain=null;
+function audioInit(){
+  AC=new (window.AudioContext||window.webkitAudioContext)();
+  const n=AC.sampleRate*2, buf=AC.createBuffer(1,n,AC.sampleRate), d=buf.getChannelData(0);
+  for(let i=0;i<n;i++)d[i]=Math.random()*2-1;
+  const s=AC.createBufferSource();s.buffer=buf;s.loop=true;
+  const f=AC.createBiquadFilter();f.type='bandpass';f.frequency.value=1800;
+  rainGain=AC.createGain();rainGain.gain.value=0;s.connect(f);f.connect(rainGain);rainGain.connect(AC.destination);s.start();
+}
+function blip(fq=660){
+  if(muted||!AC)return;
+  const o=AC.createOscillator(),g=AC.createGain();o.type='square';o.frequency.value=fq;g.gain.value=.04;
+  o.connect(g);g.connect(AC.destination);o.start();o.stop(AC.currentTime+.06);
+}
+$('#mute').onclick=()=>{
+  muted=!muted;$('#mute').textContent=muted?'🔇':'🔊';$('#mute').setAttribute('aria-pressed',String(!muted));
+  if(!muted){if(!AC)audioInit();if(AC.state==='suspended')AC.resume();}
+  blip(880);
+};
+
+/* ================================================================
+   8. KOTA (MACRO VIEW)
+================================================================ */
+function tree(x,y){const [px,py]=P(x,y);R(px-8,py-2,16,4,'rgba(0,0,0,.18)');R(px-2,py-12,4,12,'#7a4a24');R(px-10,py-22,20,8,'#2f8f46');R(px-8,py-30,16,10,'#2f8f46');R(px-5,py-35,10,7,'#3dbb70');}
+function lamp(x,y){const [px,py]=P(x,y);R(px-1,py-24,2,24,'#555');R(px-1,py-25,7,2,'#555');R(px+4,py-23,4,3,'#ffe08a');
+  lights.push({x:px+6,y:py-21,r:24,col:'255,224,138',core:[px+4,py-23,4,3]});}
+function cityGround(t){
+  const N=14;
+  poly([P(0,N),P(N,N),P(N,N,-10),P(0,N,-10)],'#4a3a2e');
+  poly([P(N,0),P(N,N),P(N,N,-10),P(N,0,-10)],'#382a20');
+  for(let x=0;x<N;x++)for(let y=0;y<N;y++){
+    const road=(x===6||x===7||y===6||y===7);
+    poly([P(x,y),P(x+1,y),P(x+1,y+1),P(x,y+1)],road?'#3b3b4f':(x+y)%2?'#5cb049':'#53a542');
+    if(!road){const p=P(x+rnd(x*9+y),y+rnd(x+y*7));R(p[0],p[1],1,2,'#3b8a34');}
+  }
+  for(let i=0;i<14;i+=2){ // marka jalan putus-putus
+    poly([P(i+.3,7-.04),P(i+1.1,7-.04),P(i+1.1,7+.04),P(i+.3,7+.04)],'#ffd166');
+    poly([P(7-.04,i+.3),P(7+.04,i+.3),P(7+.04,i+1.1),P(7-.04,i+1.1)],'#ffd166');}
+  for(let k=0;k<5;k++)poly([P(6.2+k*.3,.2),P(6.4+k*.3,.2),P(6.4+k*.3,1.4),P(6.2+k*.3,1.4)],'rgba(255,255,255,.8)');
+  // taman + kolam di pojok kanan bawah
+  poly([P(10,10),P(12,10),P(12,12),P(10,12)],'#4aa8ec');
+  const w=Math.floor(t/400)%2;poly([P(10.6+w*.1,10.6),P(11.2+w*.1,10.6),P(11.2+w*.1,10.7),P(10.6+w*.1,10.7)],'#bde7ff');
+  box(8.6,12.2,0,1.4,.4,3,'#8a5a36');
+}
+function building(k,t,ST){
+  const b=BLD[k], s=b.w/8;
+  setProj('macro');
+  roomInterior(k,b.x,b.y,s,.8,false,t,ST,b.h/.8);
+  const gl='rgba(190,225,255,.26)', fx=b.x+b.w, fy=b.y+b.d;
+  poly([P(b.x,fy),P(fx,fy),P(fx,fy,b.h),P(b.x,fy,b.h)],gl);        // dinding kaca depan kiri
+  poly([P(fx,b.y),P(fx,fy),P(fx,fy,b.h),P(fx,b.y,b.h)],gl);        // dinding kaca depan kanan
+  for(let i=0;i<=b.w;i++)edge(P(b.x+i,fy),P(b.x+i,fy,b.h),b.acc,1);
+  for(let j=0;j<=b.d;j++)edge(P(fx,b.y+j),P(fx,b.y+j,b.h),b.acc,1);
+  for(let z=(k==='apt'?15:b.h/2);z<b.h;z+=15){edge(P(b.x,fy,z),P(fx,fy,z),b.acc,1);edge(P(fx,b.y,z),P(fx,fy,z),b.acc,1);}
+  edge(P(b.x,fy,b.h),P(fx,fy,b.h),b.acc,3);edge(P(fx,b.y,b.h),P(fx,fy,b.h),b.acc,3);
+  edge(P(b.x,b.y,b.h),P(fx,b.y,b.h),b.acc,2);edge(P(b.x,b.y,b.h),P(b.x,fy,b.h),b.acc,2);
+  edge(P(b.x,fy),P(b.x,fy,b.h),b.acc,3);edge(P(fx,fy),P(fx,fy,b.h),b.acc,3);edge(P(fx,b.y),P(fx,b.y,b.h),b.acc,3);
+  // hiasan atap
+  const [rx,ry]=P(b.x+.6,b.y+.6,b.h);
+  if(k==='tc'){R(rx,ry-16,1,16,'#ddd');R(rx+1,ry-16,9,5,'#e63946');}
+  else if(k==='ca'){['#ff7aa8','#ffd166','#4aa8ec'].forEach((c,i)=>{R(rx+i*6,ry-10-i%2*3,5,6,c);R(rx+2+i*6,ry-4-i%2*3,1,4,'#ddd');});}
+  else box(b.x+.3,b.y+.3,b.h,1.2,1,3,'#9aa3b5');
+  if(k==='apt'){ // jendela apartemen: menyala terang saat malam
+    for(let f=0;f<3;f++)for(let i=0;i<4;i++){
+      const z=4+f*15,x=b.x+.5+i*1.2;
+      lights.push({win:[P(x,fy,z),P(x+.7,fy,z),P(x+.7,fy,z+7),P(x,fy,z+7)]});
+      const y=b.y+.5+i*1.2;
+      lights.push({win:[P(fx,y,z),P(fx,y+.7,z),P(fx,y+.7,z+7),P(fx,y,z+7)]});}
+  }
+}
+
+/* ================================================================
+   9. INTERIOR (MICRO VIEW) + ISI RUANGAN (dipakai juga oleh macro dengan skala kecil)
+   Koordinat lokal ruangan 8x8 tile. Dinding belakang: y=0 dan x=0.
+================================================================ */
+const DESKP=[{x:1.2,y:2.4,w:2,d:1},{x:4.6,y:2.4,w:2.4,d:1.1}];
+const BEDX=[.3,1.7,3.1,4.5], SOFAP=[[6.0,3.65],[7.0,3.65]], STANDP=[[1.7,4.0],[4.2,3.2]], TBL={x:1.3,y:5.6,w:4.4,d:1};
+const STN=i=>[TBL.x+.55+i*1.1,TBL.y-.55];
+const FURN={
+  tc:{b:[[.2,.15,0,2.4,.7,34,'#8a5a36'],[6.6,.15,0,1.2,.7,16,'#6f8ac0'],[2.2,3.6,0,3.6,2.4,.6,'#c9d8f0'],[7.1,6.9,0,.5,.5,7,'#b5654a'],[7.15,6.95,7,.4,.4,6,'#3dbb70']],
+      f:[1.4,3.5,5.6].flatMap(x=>[5.1,6.4].map(y=>[x,y,0,1.5,.7,6,'#d9b38c']))},
+  ca:{b:[[.2,.15,0,2.4,.7,34,'#ff9db0'],[5.4,5.4,0,2.2,1.2,8,'#b197fc'],[.5,5.2,0,1,1,4,'#ffd166'],[1.8,5.7,0,.9,.9,4,'#8be8cf'],[2.2,3.8,0,3.4,2.2,.6,'#ffd6e8'],[7.1,.4,0,.5,.5,7,'#b5654a'],[7.15,.45,7,.4,.4,6,'#3dbb70']],
+      f:[[3.6,6.2,0,1,.7,4,'#ffa94d']]},
+  apt:{b:BEDX.flatMap(x=>[[x,.2,0,1.3,2.3,3,'#8a5a36'],[x+.05,.25,3,1.2,2.2,2,'#e8f0ff'],[x+.2,.3,5,.9,.6,1,'#ffffff']]).concat([[.1,3.0,0,.8,3.2,9,'#cfd8e6'],[.1,6.4,0,.9,.9,24,'#e8eef7'],[5.7,2.0,0,1.8,.7,4,'#c9904f'],[5.1,3.3,0,2.8,.8,5,'#e0566b'],[5.0,3.3,0,.2,1.2,9,'#c24458'],[7.8,3.3,0,.2,1.2,9,'#c24458']]),
+       f:[[5.1,4.1,0,2.8,.25,13,'#c24458'],[7.2,6.9,0,.5,.5,7,'#b5654a'],[7.25,6.95,7,.4,.4,6,'#3dbb70']]}
+};
+const wr=(Q_,a,b,z1,z2,c)=>poly([Q_(a,0,z1),Q_(b,0,z1),Q_(b,0,z2),Q_(a,0,z2)],c);   // persegi di dinding belakang kanan
+const wl=(Q_,a,b,z1,z2,c)=>poly([Q_(0,a,z1),Q_(0,b,z1),Q_(0,b,z2),Q_(0,a,z2)],c);   // persegi di dinding kiri
+function extras(a,x,y){
+  if(a.x==='glasses')R(x-3,y-15,6,1,'#222');
+  if(a.x==='tie')R(x,y-8,1,5,'#d9576b');
+  if(a.x==='pigtail'){R(x-6,y-17,2,5,a.hair);R(x+4,y-17,2,5,a.hair);}
+  if(a.x==='beret')R(x-5,y-21,10,3,'#c0392b');
+}
+function head(bx,by,a,back){
+  R(bx-5,by-9,10,9,a.shirt);R(bx-4,by-18,8,8,a.skin);
+  R(bx-4,by-19,8,back?9:3,a.hair);R(bx-5,by-18,1,4,a.hair);R(bx+4,by-18,1,4,a.hair);
+  if(!back){R(bx-2,by-14,1,1,'#1a1a2e');R(bx+1,by-14,1,1,'#1a1a2e');}
+  extras(a,bx,by);
+}
+function roomInterior(k,bx,by,s,zs,micro,t,ST,Hh){
+  const b=BLD[k], Q_=(x,y,z=0)=>P(bx+x*s,by+y*s,z*zs), B=(x,y,z,w,d,h,c)=>box(bx+x*s,by+y*s,z*zs,w*s,d*s,h*zs,c);
+  for(let i=0;i<8;i++)for(let j=0;j<8;j++)poly([Q_(i,j),Q_(i+1,j),Q_(i+1,j+1),Q_(i,j+1)],(i+j)%2?b.f1:b.f2);
+  poly([Q_(0,0),Q_(0,8),Q_(0,8,Hh),Q_(0,0,Hh)],b.wall2);
+  poly([Q_(0,0),Q_(8,0),Q_(8,0,Hh),Q_(0,0,Hh)],b.wall);
+  if(micro)decor(k,Q_,t,Hh);
+  FURN[k].b.forEach(it=>B(...it));
+  const here=AGENTS.filter(a=>ST[a.id].loc===k), seated=[];
+  here.forEach(a=>{
+    const S=ST[a.id], m=S.mode;
+    if(k!=='apt'||m==='overtime'){seated.push(a);return;}
+    if(m==='sleep'){ // tidur di kasur
+      const x=BEDX[a.i]+.65,[px,py]=Q_(x,.75,6);
+      poly([Q_(x-.5,1.1,6),Q_(x+.5,1.1,6),Q_(x+.5,2.4,6),Q_(x-.5,2.4,6)],a.shirt);
+      if(micro){R(px-3,py-5,6,6,a.skin);R(px-3,py-6,6,2,a.hair);labels.push({bubble:1,w:20,x:px+8,y:py-14,text:'zZ'});labels.push({x:px,y:py-24,text:a.name,id:a.id});hits.push({id:a.id,x:px-16,y:py-26,w:34,h:50});}
+      else R(px-1,py-3,3,3,a.skin);
+    }else if(a.i<2){ // nonton TV di sofa (tampak belakang)
+      const [px,py]=Q_(SOFAP[a.i][0],SOFAP[a.i][1],5);
+      if(micro){head(px,py,a,true);labels.push({x:px,y:py-34,text:a.name,id:a.id});labels.push({bubble:1,w:44,x:px+9,y:py-22,text:'TV'});hits.push({id:a.id,x:px-9,y:py-30,w:18,h:32});}
+      else{R(px-1,py-7,3,3,a.skin);R(px-1,py-4,3,4,a.shirt);}
+    }else{ // berdiri santai dengan cangkir
+      const [px,py]=Q_(...STANDP[a.i-2]);
+      if(micro){R(px-3,py-8,2,8,'#3b3552');R(px+1,py-8,2,8,'#3b3552');head(px,py-8,a,false);R(px+5,py-17-(Math.floor(t/700)%2),3,3,'#ff7a90');
+        labels.push({x:px,y:py-43,text:a.name,id:a.id});labels.push({bubble:1,w:44,x:px+10,y:py-30,text:'REHAT'});hits.push({id:a.id,x:px-9,y:py-40,w:18,h:48});}
+      else{R(px-1,py-7,3,3,a.skin);R(px-1,py-4,3,4,a.shirt);}
+    }
+  });
+  // agen duduk di meja: kursi + badan dulu, lalu meja, lalu tangan + laptop (urutan kedalaman)
+  const spot=a=>k==='apt'?STN(a.i):[DESKP[a.desk].x+DESKP[a.desk].w/2,DESKP[a.desk].y-.55];
+  seated.forEach(a=>{
+    const [cx,cy]=spot(a);
+    B(cx-.35,cy-.3,0,.7,.6,5,'#3b3552');B(cx-.35,cy-.4,5,.7,.1,15,'#4a4366');
+    const [px,py]=Q_(cx,cy,5);
+    if(micro)head(px,py,a,false);else{R(px-1,py-7,3,3,a.skin);R(px-1,py-4,3,4,a.shirt);}
+  });
+  if(k==='apt')B(TBL.x,TBL.y,0,TBL.w,TBL.d,9,'#c9904f');else DESKP.forEach(d=>B(d.x,d.y,0,d.w,d.d,10,k==='tc'?'#b08a5c':'#d9a566'));
+  seated.forEach(a=>{
+    const [cx,cy]=spot(a), dy=cy+.55, S=ST[a.id], ot=S.mode==='overtime', ty=S.mode==='work'||ot;
+    const [lx,ly]=Q_(cx,dy+.55,10);
+    if(micro){
+      const [hx,hy]=Q_(cx,dy+.4,10), f=ty?Math.floor(t/130)%2:0;
+      R(hx-7,hy-12,3,11,a.shirt);R(hx+4,hy-12,3,11,a.shirt);R(hx-6+f,hy-2,3,2,a.skin);R(hx+3-f,hy-2,3,2,a.skin);
+      B(cx-.45,dy+.5,10,.9,.5,1,'#9aa3b5');B(cx-.45,dy+.5,11,.9,.07,9,'#c7ceda');
+      R(lx-1,ly-14,2,2,'#e8ecf4');
+      const [px,py]=Q_(cx,cy,5);
+      labels.push({x:px,y:py-35,text:a.name,id:a.id});
+      labels.push({bubble:1,w:ot?28:27,x:px+10,y:py-22,text:ot?'OT!':'...'.slice(0,1+Math.floor(t/350)%3),red:ot});
+      hits.push({id:a.id,x:px-16,y:py-38,w:34,h:64});
+    }else R(lx-2,ly-2,4,2,ot?'#ff6b81':'#bde7ff');
+    lights.push({x:lx,y:ly-(micro?8:2),r:micro?18:9,col:ot?'255,120,130':'140,200,255',k:.7});
+  });
+  FURN[k].f.forEach(it=>B(...it));
+}
+/* dekorasi dinding & jendela (micro saja) */
+function decor(k,Q_,t,Hh){
+  const b=BLD[k], night=skyD>.3, win=curSky.cols[3];
+  const sky=(a,c,z1,z2,left)=>{(left?wl:wr)(Q_,a,c,z1,z2,'#f4ecff');(left?wl:wr)(Q_,a+.1,c-.1,z1+2,z2-2,win);
+    if(night)for(let i=0;i<6;i++){const p=left?Q_(0,a+.3+rnd(i)*(c-a-.6),z1+4+rnd(i+9)*(z2-z1-8)):Q_(a+.3+rnd(i)*(c-a-.6),0,z1+4+rnd(i+9)*(z2-z1-8));R(p[0],p[1],1,1,'#fff');}};
+  if(k==='tc'){
+    wr(Q_,3.0,6.4,16,44,'#8a5a36');wr(Q_,3.1,6.3,17,43,'#fbfbff');
+    wr(Q_,3.5,5.6,36,37,'#4a2f8a');wr(Q_,3.5,5.0,31,32,'#d9576b');wr(Q_,3.5,5.9,26,27,'#4a2f8a');wr(Q_,3.5,4.6,21,22,'#2f9e5b');
+    sky(.8,3.4,18,44,true);
+    wr(Q_,6.7,7.4,38,46,'#fff');wr(Q_,6.9,7.2,40,44,'#303050');
+  }else if(k==='ca'){
+    wr(Q_,3.0,6.4,16,42,'#8a5a36');wr(Q_,3.1,6.3,17,41,'#fff4d6');
+    [[3.4,30,'#ffd166'],[4.2,34,'#ff9db0'],[5.0,28,'#8be8cf'],[3.8,22,'#9fd0ff'],[5.2,22,'#ffa94d']].forEach(n=>wr(Q_,n[0],n[0]+.6,n[1],n[1]+6,n[2]));
+    for(let i=0;i<10;i++){const x=.4+i*.75,p=[Q_(x,0,56),Q_(x+.5,0,56),Q_(x+.25,0,50)];poly(p,['#ff7aa8','#ffd166','#4aa8ec','#5be3a0'][i%4]);}
+    sky(.8,3.4,18,44,true);
+  }else{
+    sky(1.0,4.4,24,46,false);wr(Q_,1.0,4.4,35,36,'#f4ecff');
+    wr(Q_,5.9,7.7,14,32,'#222');wr(Q_,6.0,7.6,15,31,Math.floor(t/500)%3?'#4a78d6':'#6a98f0');
+    wl(Q_,3.2,5.8,22,40,'#8be8cf');
+  }
+  // papan nama divisi di dinding (miring mengikuti bidang dinding)
+  wr(Q_,1.2,6.8,50,62,'#0e0a1a');wr(Q_,1.2,6.8,60.5,62,b.acc);
+  ctx.font='8px "Press Start 2P",monospace';ctx.textBaseline='top';
+  const [sx,sy]=Q_(1.2,0,59), off=Math.round((5.6*TW-ctx.measureText(b.sign).width)/2);
+  ctx.save();ctx.transform(1,TH/TW,0,1,sx+off,sy+off*TH/TW);
+  ctx.fillStyle=b.acc;ctx.fillText(b.sign,1,1);ctx.fillStyle='#fff';ctx.fillText(b.sign,0,0);ctx.restore();
+}
+function microDraw(t,ST){
+  setProj('micro');
+  R(0,0,W,H,'#241a3a');for(let i=0;i<60;i++)R((i*83)%W,(i*47)%H,2,2,'#2d2248');
+  const b=BLD[view];
+  poly([P(0,8),P(8,8),P(8,8,-8),P(0,8,-8)],'#3a2f5e');poly([P(8,0),P(8,8),P(8,8,-8),P(8,0,-8)],'#2a2146');
+  roomInterior(view,0,0,1,1,true,t,ST,62);
+  // lantai/dinding kiri atas tepi + pot lampu
+  const c=P(4,4,30);lights.push({x:c[0],y:c[1],r:100,col:'255,222,160',k:.5});
+}
+
+/* ================================================================
+   10. UI: POPUP, BADGE, NAVIGASI
+================================================================ */
+let view=null, fade=0, curSky=skyAt(12), skyD=0, lights=[], labels=[], hits=[], curST={};
+function openCard(title,sub,rows){
+  $('#mt').textContent=title;$('#ms').textContent=sub;const dl=$('#md');dl.textContent='';
+  rows.forEach(([k,v])=>{const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=k;dd.textContent=v;dl.append(dt,dd);});
+  $('#modal').classList.add('open');$('#mx').focus();blip(740);
+}
+function openAgent(id){
+  const a=AGENTS.find(x=>x.id===id),S=curST[id]; if(!a||!S)return;
+  openCard(a.name,a.role,[['Lokasi',BLD[S.loc].name],['Status',S.status],['Aktivitas',actOf(a,S)],
+    ['Status Firebase',S.raw.status?String(S.raw.status):'-'],['Diperbarui',fmtT(S.raw.updated_at||S.raw.timestamp)]]);
+}
+$('#mx').onclick=()=>$('#modal').classList.remove('open');
+$('#modal').addEventListener('click',e=>{if(e.target.id==='modal')$('#modal').classList.remove('open');});
+$('#otban').onclick=()=>openCard('Overtime Active','Apartemen Pekerja',AGENTS.filter(a=>curST[a.id].mode==='overtime').map(a=>[a.name,actOf(a,curST[a.id])]));
+addEventListener('keydown',e=>{if(e.key==='Escape'){$('#modal').classList.remove('open');if(view)go(null);}});
+function go(v){view=v;fade=1;$('#back').hidden=!v;$('#badges').style.display=v?'none':'';blip(v?520:400);}
+$('#back').onclick=()=>go(null);
+const badgeEl={};
+function initBadges(){
+  setProj('macro');
+  for(const k in BLD){
+    const b=BLD[k],[x,y]=P(b.x,b.y,b.h),d=document.createElement('button');
+    d.className='badge';d.style.left=(x/W*100)+'%';d.style.top=((y-4)/H*100)+'%';
+    d.innerHTML='<b>'+b.name+'</b><i>'+b.label+'</i><span class="st"></span>';
+    d.setAttribute('aria-label','Masuk ke '+b.name);d.onclick=()=>go(k);$('#badges').appendChild(d);badgeEl[k]=d;
+  }
+}
+function updateUI(h,ST){
+  curST=ST;
+  const n=k=>AGENTS.filter(a=>ST[a.id].loc===k), work=h*60>=480&&h*60<=1020;
+  for(const k in BLD){
+    const ags=n(k), ot=ags.some(a=>ST[a.id].mode==='overtime');
+    let txt,cls;
+    if(k==='apt'){txt=ot?'Overtime Active · '+ags.length:ags.length?'Resting / Standby · '+ags.length:'Kosong (agen di kantor)';cls=ot?'ot':ags.length?'':'off';}
+    else{txt=work?'Working at Office · '+ags.length+'/2':'Tutup (di luar jam kerja)';cls=work?'work':'off';}
+    const o=DB[k]&&DB[k].badge; if(o)txt=String(o);
+    const st=badgeEl[k].querySelector('.st');st.textContent=txt;st.className='st '+cls;
+  }
+  $('#otban').hidden=!(view==='apt'&&n('apt').some(a=>ST[a.id].mode==='overtime'));
+  const t=fb.sync?fmtWIB(fb.sync):'--:--:--';
+  $('#sync').textContent='Last Sync: '+t+' | Firebase Status: '+(fb.ok?'Connected':'Disconnected'+(fb.demo?' (mode demo)':'')+(fb.err?' ['+fb.err+']':''));
+  renderWx();
+  if(rainGain)rainGain.gain.value=(!muted&&raining)?.08:0;
+}
+cv.addEventListener('click',e=>{
+  const b=cv.getBoundingClientRect(),x=(e.clientX-b.left)/b.width*W,y=(e.clientY-b.top)/b.height*H;
+  if(!view)return;
+  for(let i=hits.length-1;i>=0;i--){const q=hits[i];if(x>=q.x&&x<=q.x+q.w&&y>=q.y&&y<=q.y+q.h){openAgent(q.id);return;}}
+});
+
+/* ================================================================
+   11. HUJAN, LAMPU, LABEL, LOOP RENDER
+================================================================ */
+const drops=Array.from({length:90},(_,i)=>({x:rnd(i)*W,y:rnd(i+50)*H,v:170+rnd(i+9)*120}));
+function drawLight(l,nk){
+  if(l.win){poly(l.win,'rgba(255,224,138,'+(.9*nk).toFixed(2)+')');return;}
+  const k=nk*(l.k||1);
+  [[1,.1],[.7,.12],[.4,.16]].forEach(([s,a])=>{ctx.fillStyle='rgba('+l.col+','+(a*k).toFixed(3)+')';ctx.beginPath();ctx.arc(l.x,l.y,l.r*s,0,6.283);ctx.fill();});
+  if(l.core){ctx.globalAlpha=nk;R(l.core[0],l.core[1],l.core[2],l.core[3],'rgb('+l.col+')');ctx.globalAlpha=1;}
+}
+function drawLabel(l){
+  ctx.font='8px "Press Start 2P",monospace';ctx.textBaseline='top';
+  if(l.bubble){R(l.x-1,l.y-1,l.w+2,12,'#2b1d40');R(l.x,l.y,l.w,10,l.red?'#ff6b81':'#fff');R(l.x-3,l.y+5,3,3,l.red?'#ff6b81':'#fff');
+    ctx.fillStyle=l.red?'#fff':'#2b1d40';ctx.fillText(l.text,l.x+2,l.y+1);}
+  else{const w=Math.ceil(ctx.measureText(l.text).width);R(l.x-w/2-3,l.y,w+6,11,'rgba(20,12,40,.9)');ctx.fillStyle='#f3ecff';ctx.fillText(l.text,l.x-w/2,l.y+2);}
+}
+function frame(ms){
+  const dt=Math.min(.1,(ms-(frame.t0||ms))/1000);frame.t0=ms;
+  const h=nowWIB(), S=skyAt(h), ST={}; AGENTS.forEach(a=>ST[a.id]=stateOf(a,h));
+  curSky=S;skyD=S.d;rainK+=((raining?1:0)-rainK)*Math.min(1,dt*1.5);
+  const dark=clamp(skyD+rainK*.18,0,.75), nk=clamp((dark-.15)/.3);
+  lights=[];labels=[];hits=[];
+  // langit
+  const bh=Math.ceil(H/6);S.cols.forEach((c,i)=>R(0,i*bh,W,bh,c));
+  if(skyD>.35){ctx.globalAlpha=clamp((skyD-.35)/.2);for(let i=0;i<90;i++)R((i*97)%W,(i*53)%150,i%7?1:2,i%7?1:2,Math.floor(ms/500+i)%6?'#fff':'#8c92c8');ctx.globalAlpha=1;}
+  const day=h>=5&&h<18.5,p=day?(h-5)/13.5:((h<5?h+24:h)-18.5)/10.5, sx=Math.round(W*(.1+.8*p)), sy=Math.round(125-Math.sin(Math.PI*p)*100);
+  if(day){R(sx-7,sy-7,14,14,'#ffe27a');R(sx-5,sy-9,10,18,'#ffe27a');R(sx-9,sy-5,18,10,'#ffe27a');}else{R(sx-6,sy-6,12,12,'#f4f1d8');R(sx+1,sy-3,3,3,'#d9d5b5');}
+  ctx.globalAlpha=1-dark*.6;const cc=rainK>.3?'#c9d0e0':'#fff';
+  for(let i=0;i<4+Math.round(rainK*3);i++){const x=((ms/260+i*110)%(W+80))-40,y=12+i*18;R(x,y,28,6,cc);R(x+6,y-4,14,4,cc);}
+  ctx.globalAlpha=1;
+  // dunia
+  if(!view){
+    setProj('macro');cityGround(ms);
+    building('tc',ms,ST);building('ca',ms,ST);building('apt',ms,ST);
+    tree(0.5,5);tree(0.5,12.5);tree(13.3,7.5);tree(9,10);tree(12.6,12.5);tree(13.3,0.4);
+    [[6,6],[8,6],[6,8],[8,8]].forEach(q=>lamp(q[0],q[1]));
+    R(0,0,W,H,'rgba(8,10,40,'+(dark*.62).toFixed(2)+')');
+  }else{
+    microDraw(ms,ST);
+    const lit=view==='apt'?(h*60>1020||h*60<480||Object.values(ST).some(s=>s.mode==='overtime')):(h*60>=480&&h*60<=1020);
+    R(0,0,W,H,'rgba(8,10,40,'+(lit?dark*.3:.18+dark*.5).toFixed(2)+')');
+  }
+  // lampu, label, hujan
+  ctx.save();if(nk>0)lights.forEach(l=>drawLight(l,nk));ctx.restore();
+  labels.forEach(drawLabel);
+  if(rainK>.02){ctx.globalAlpha=clamp(rainK);drops.forEach(d=>{d.y+=d.v*dt;d.x-=d.v*.22*dt;if(d.y>H||d.x<0){d.y=-6;d.x=Math.random()*(W+60);}R(d.x,d.y,1,5,'#a9c4ff');});ctx.globalAlpha=1;}
+  if(fade>0){R(0,0,W,H,'rgba(255,255,255,'+fade.toFixed(2)+')');fade=Math.max(0,fade-dt*4);}
+  const sec=Math.floor(ms/1000);if(sec!==frame.s){frame.s=sec;updateUI(h,ST);}
+  requestAnimationFrame(frame);
+}
+
+/* ================================================================
+   12. START
+================================================================ */
+if(document.fonts&&document.fonts.load)document.fonts.load('8px "Press Start 2P"');
+initBadges();
+startFirebase();
+fetchWeather();setInterval(fetchWeather,WX_EVERY);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
